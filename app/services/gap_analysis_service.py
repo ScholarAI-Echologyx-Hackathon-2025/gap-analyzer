@@ -28,6 +28,7 @@ from app.services.gemini_service import GeminiService
 from app.services.search_service import WebSearchService
 from app.services.grobid_client import GrobidClient
 from app.utils.helpers import AsyncBatchProcessor
+from app.core.config import settings
 
 
 class GapAnalysisService:
@@ -60,10 +61,11 @@ class GapAnalysisService:
             logger.info(f"Starting gap analysis for paper: {request.paperId}")
             logger.info(f"Request ID: {request.requestId}, Correlation ID: {request.correlationId}")
             
-            # Test network connectivity first
-            logger.info("Step 1: Testing network connectivity...")
-            await self._test_network_connectivity()
-            logger.info("Network connectivity test completed successfully")
+            # Optional: Test network connectivity first
+            if settings.RUN_CONNECTIVITY_TESTS:
+                logger.info("Step 1: Testing network connectivity...")
+                await self._test_network_connectivity()
+                logger.info("Network connectivity test completed successfully")
             
             # Create gap analysis record
             logger.info("Step 2: Creating gap analysis record...")
@@ -480,7 +482,7 @@ class GapAnalysisService:
             try:
                 related_papers = await self.search_service.search_papers(
                     search_query,
-                    max_results=5
+                    max_results=int(settings.GAP_VALIDATION_PAPERS)
                 )
                 logger.info(f"Paper search completed. Found {len(related_papers)} papers")
             except Exception as search_error:

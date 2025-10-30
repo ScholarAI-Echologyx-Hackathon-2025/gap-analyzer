@@ -11,20 +11,21 @@ import json
 
 from app.schemas.gap_schemas import PaperSearchResult
 from app.utils.helpers import retry_async, parse_json_safely, clean_text, calculate_similarity, RateLimiter
+from app.core.config import settings
 
 
 class WebSearchService:
     """Service for searching academic papers on the web."""
     
     def __init__(self):
-        self.client = httpx.AsyncClient(timeout=30.0)  # Standard timeout
+        self.client = httpx.AsyncClient(timeout=float(settings.SEARCH_TIMEOUT))
         # Using only arXiv for now to avoid rate limiting issues
         self.search_apis = {
             'arxiv': 'https://export.arxiv.org/api/query'
         }
         # Rate limiter for arXiv only
         self.rate_limiters = {
-            'arxiv': RateLimiter(max_calls=5, time_window=60)  # 5 calls per minute for arXiv
+            'arxiv': RateLimiter(max_calls=int(settings.ARXIV_RATE_LIMIT_PER_MINUTE), time_window=60)
         }
     
     async def search_papers(
@@ -113,10 +114,7 @@ class WebSearchService:
             }
             
             logger.info(f"Making HTTP request to: {self.search_apis['arxiv']}")
-            response = await self.client.get(
-                self.search_apis['arxiv'],
-                params=params
-            )
+            response = await self.client.get(self.search_apis['arxiv'], params=params)
             logger.info(f"arXiv API response status: {response.status_code}")
             
             if response.status_code == 200:

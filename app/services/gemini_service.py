@@ -29,8 +29,8 @@ class GeminiService:
         
         # Circuit breaker state
         self.circuit_breaker_failures = 0
-        self.circuit_breaker_threshold = 3
-        self.circuit_breaker_timeout = 300  # 5 minutes
+        self.circuit_breaker_threshold = int(settings.GA_CIRCUIT_BREAKER_THRESHOLD)
+        self.circuit_breaker_timeout = int(settings.GA_CIRCUIT_BREAKER_TIMEOUT)
         self.circuit_breaker_last_failure = None
         self.circuit_breaker_state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
     
@@ -73,7 +73,7 @@ class GeminiService:
         import random
         
         delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
-        max_delay = 60  # Maximum 60 seconds
+        max_delay = float(settings.GA_MAX_BACKOFF_SECONDS)
         delay = min(delay, max_delay)
         
         logger.info(f"Exponential backoff: waiting {delay:.2f} seconds before retry {attempt + 1}")

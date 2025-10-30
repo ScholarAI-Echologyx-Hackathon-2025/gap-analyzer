@@ -10,6 +10,7 @@ import asyncio
 
 from app.schemas.gap_schemas import ExtractedContent, PaperSearchResult
 from app.utils.helpers import retry_async, parse_json_safely
+from app.core.config import settings
 
 
 class GrobidClient:
@@ -17,10 +18,10 @@ class GrobidClient:
     
     def __init__(self, grobid_url: str):
         self.grobid_url = grobid_url.rstrip('/')
-        # Increased timeout significantly for large PDFs and GROBID processing
-        self.client = httpx.AsyncClient(timeout=300.0)  # 5 minutes timeout
+        # Timeout configurable via settings
+        self.client = httpx.AsyncClient(timeout=float(settings.GROBID_TIMEOUT))
         # Semaphore to limit concurrent GROBID requests
-        self.semaphore = asyncio.Semaphore(2)  # Max 2 concurrent requests
+        self.semaphore = asyncio.Semaphore(int(settings.GROBID_MAX_CONCURRENT))
     
     @retry_async(max_attempts=3, delay=2)
     async def extract_from_url(
@@ -77,7 +78,7 @@ class GrobidClient:
                 logger.info(f"Calling GROBID API at: {self.grobid_url}/api/processFulltextDocument (attempt {attempt + 1})")
                 logger.info(f"PDF size: {len(pdf_bytes)} bytes")
                 
-                # Call GROBID processFulltextDocument
+            # Call GROBID processFulltextDocument
                 response = await self.client.post(
                     f"{self.grobid_url}/api/processFulltextDocument",
                     files={'input': ('document.pdf', pdf_bytes, 'application/pdf')},
@@ -147,7 +148,7 @@ class GrobidClient:
         successful_extractions = 0
         
         # Process papers in smaller batches sequentially to avoid overwhelming GROBID
-        batch_size = 3  # Process 3 papers at a time
+        batch_size = int(settings.GROBID_BATCH_SIZE)
         for batch_start in range(0, len(papers), batch_size):
             batch_end = min(batch_start + batch_size, len(papers))
             batch_papers = papers[batch_start:batch_end]
@@ -198,8 +199,9 @@ class GrobidClient:
             # Log batch completion and wait before next batch
             logger.info("Batch %d completed: %d/%d successful", batch_start//batch_size + 1, batch_successful, len(tasks))
             if batch_end < len(papers):
-                logger.info("Waiting 3 seconds before processing next batch to ensure GROBID stability...")
-                await asyncio.sleep(3)
+                pause = int(settings.GROBID_BATCH_PAUSE_SECONDS)
+                logger.info(f"Waiting {pause} seconds before processing next batch to ensure GROBID stability...")
+                await asyncio.sleep(pause)
         
         logger.info(f"Batch extraction completed: {successful_extractions}/{len(papers)} successful")
         return extracted_contents

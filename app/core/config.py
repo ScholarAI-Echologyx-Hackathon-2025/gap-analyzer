@@ -48,11 +48,17 @@ class Settings(BaseSettings):
     
     # External Services
     GROBID_URL: str
-    # Hardcoded GROBID timeout
-    GROBID_TIMEOUT: int = 120  # Increased timeout for GROBID processing
+    # GROBID settings
+    GROBID_TIMEOUT: int = 120  # seconds
+    GROBID_MAX_CONCURRENT: int = 2
+    GROBID_BATCH_SIZE: int = 3
+    GROBID_BATCH_PAUSE_SECONDS: int = 3
     GA_GEMINI_API_KEY: str
     GA_GEMINI_MODEL: str = "gemini-2.0-flash-exp"
     GA_GEMINI_RATE_LIMIT: int = 2  # requests per minute (extremely conservative for free tier)
+    GA_MAX_BACKOFF_SECONDS: int = 60
+    GA_CIRCUIT_BREAKER_THRESHOLD: int = 3
+    GA_CIRCUIT_BREAKER_TIMEOUT: int = 300  # seconds
     
     # Search Service Configuration (hardcoded - URLs not used in code)
     # SEMANTIC_SCHOLAR_API_URL: str = "https://api.semanticscholar.org/graph/v1/paper/search"
@@ -61,6 +67,7 @@ class Settings(BaseSettings):
     # Hardcoded search settings
     SEARCH_MAX_RESULTS: int = 10
     SEARCH_TIMEOUT: int = 30
+    ARXIV_RATE_LIMIT_PER_MINUTE: int = 5
     
     # Gap Analysis Configuration (hardcoded)
     MAX_GAPS_PER_PAPER: int = 7
@@ -68,6 +75,7 @@ class Settings(BaseSettings):
     GAP_VALIDATION_PAPERS: int = 5
     GAP_CONFIDENCE_THRESHOLD: float = 0.5
     VALIDATION_BATCH_SIZE: int = 5
+    RUN_CONNECTIVITY_TESTS: bool = False
     
     # Logging Configuration
     LOG_LEVEL: str = "INFO"
