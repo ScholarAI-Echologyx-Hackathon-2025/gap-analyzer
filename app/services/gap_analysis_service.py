@@ -22,7 +22,7 @@ from app.model.paper_extraction import (
 )
 from app.schemas.gap_schemas import (
     GapAnalysisRequest, GapAnalysisResponse,
-    GapDetail, ResearchTopic, InitialGap
+    GapDetail, ResearchTopic, InitialGap, ValidationResult
 )
 from app.services.gemini_service import GeminiService
 from app.services.search_service import WebSearchService
@@ -105,9 +105,8 @@ class GapAnalysisService:
                 )
             logger.info(f"Generated {len(initial_gaps)} initial gaps")
             
-            # Process gaps in batches for better performance
+            # Process gaps sequentially to respect external rate limits
             logger.info("Step 5: Processing gaps for validation and expansion...")
-            # Process gaps sequentially to avoid rate limiting
             gap_results = []
             for i, gap in enumerate(initial_gaps):
                 logger.info(f"Processing gap {i+1}/{len(initial_gaps)}: {gap.name}")
@@ -428,10 +427,10 @@ class GapAnalysisService:
             
             # Validate gap (without creating database records)
             logger.info(f"Validating gap {index+1}...")
-            is_valid = await self._validate_gap(gap)
-            logger.info(f"Validation completed for gap {index+1}. Valid: {is_valid}")
+            validation_result = await self._validate_gap(gap)
+            logger.info(f"Validation completed for gap {index+1}. Valid: {validation_result.is_valid}, confidence: {validation_result.confidence}")
             
-            if is_valid:
+            if validation_result.is_valid:
                 # Expand gap details (without creating database records)
                 logger.info(f"Expanding details for gap {index+1}: {gap.name}")
                 expanded_details = await self._expand_gap_details(gap)
@@ -444,7 +443,7 @@ class GapAnalysisService:
                     'description': gap.description,
                     'category': gap.category,
                     'validation_status': 'VALID',
-                    'confidence_score': 0.8,
+                    'confidence_score': float(validation_result.confidence or 0.8),
                     'potential_impact': expanded_details.get('potential_impact'),
                     'research_hints': expanded_details.get('research_hints'),
                     'implementation_suggestions': expanded_details.get('implementation_suggestions'),
@@ -466,7 +465,7 @@ class GapAnalysisService:
     async def _validate_gap(
         self,
         gap: InitialGap
-    ) -> bool:
+    ) -> ValidationResult:
         """Validate a research gap by searching for related work."""
         try:
             logger.info(f"Starting gap validation for: {gap.name}")
@@ -503,7 +502,7 @@ class GapAnalysisService:
             
             if not related_papers:
                 logger.warning("No related papers found, assuming gap is valid")
-                return True
+                return ValidationResult(is_valid=True, confidence=0.5, reasoning="No related papers found", should_modify=False)
             
             # Extract content from papers
             logger.info(f"Starting content extraction from {len(related_papers)} papers using GROBID")
@@ -533,12 +532,12 @@ class GapAnalysisService:
                 extracted_contents
             )
             
-            return validation_result.is_valid
+            return validation_result
                 
         except Exception as e:
             logger.error(f"Error validating gap: {e}")
-            # Return True on error to avoid blocking processing
-            return True
+            # Assume valid with low confidence on error to avoid blocking processing
+            return ValidationResult(is_valid=True, confidence=0.3, reasoning="Validation error - assumed valid", should_modify=False)
     
     async def _expand_gap_details(
         self,
@@ -669,7 +668,7 @@ class GapAnalysisService:
         return GapAnalysisResponse(
             requestId=analysis.request_id,
             correlationId=analysis.correlation_id,
-            status="SUCCESS",
+            status="COMPLETED",
             message=f"Successfully identified {len(valid_gap_data)} valid research gaps",
             gapAnalysisId=str(analysis.id),
             totalGaps=analysis.total_gaps_identified,
