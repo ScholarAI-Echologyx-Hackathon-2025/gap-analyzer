@@ -138,7 +138,7 @@ async def list_gap_analyses(
     db: AsyncSession = Depends(get_db)
 ):
     """List gap analyses with pagination."""
-    query = select(GapAnalysis).order_by(GapAnalysis.started_at.desc())
+    query = select(GapAnalysis).order_by(GapAnalysis.created_at.desc())
     
     if status:
         query = query.where(GapAnalysis.status == status)
@@ -166,7 +166,7 @@ async def list_gap_analyses(
                 "status": analysis.status,
                 "total_gaps": analysis.total_gaps_identified,
                 "valid_gaps": analysis.valid_gaps_count,
-                "created_at": analysis.started_at.isoformat() if analysis.started_at else None,
+                "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
                 "completed_at": analysis.completed_at.isoformat() if analysis.completed_at else None
             }
             for analysis in analyses
@@ -203,7 +203,7 @@ async def get_gap_analysis(
         "status": analysis.status,
         "total_gaps": analysis.total_gaps_identified,
         "valid_gaps": analysis.valid_gaps_count,
-        "created_at": analysis.started_at.isoformat() if analysis.started_at else None,
+        "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
         "completed_at": analysis.completed_at.isoformat() if analysis.completed_at else None,
         "gaps": [
             {
@@ -274,7 +274,7 @@ async def get_statistics(
     recent_result = await db.execute(
         select(func.count())
         .select_from(GapAnalysis)
-        .where(GapAnalysis.started_at >= since)
+        .where(GapAnalysis.created_at >= since)
     )
     recent_analyses = recent_result.scalar()
     
@@ -285,7 +285,7 @@ async def get_statistics(
             func.count().label('count')
         )
         .select_from(GapAnalysis)
-        .where(GapAnalysis.started_at >= since)
+        .where(GapAnalysis.created_at >= since)
         .group_by(GapAnalysis.status)
     )
     status_breakdown = {row.status: row.count for row in status_result}
